@@ -1,21 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using unvell.ReoGrid.DataFormat;
+﻿using unvell.ReoGrid.DataFormat;
 
 namespace ReoGrid.Mvvm.Attributes
 {
     public class DateTimeFormatAttribute: FormatAttributeBase
     {
-        public override CellDataFormatFlag CellDataFormatFlag
-        {
-            get
-            {
-                return CellDataFormatFlag.DateTime;
-            }
-        }
+        public override CellDataFormatFlag CellDataFormatFlag => CellDataFormatFlag.DateTime;
+
         /// <summary>
         /// Get or set the date time pattern. (Standard .NET datetime pattern is supported, e.g.: yyyy/MM/dd)
         /// </summary>

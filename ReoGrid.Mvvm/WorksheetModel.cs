@@ -7,13 +7,10 @@ using unvell.ReoGrid;
 using unvell.ReoGrid.Events;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Input;
 using System.Windows.Media;
 using unvell.ReoGrid.DataFormat;
 using ReoGrid.Mvvm.Attributes;
 using ReoGrid.Mvvm.Interfaces;
-using System.Windows.Forms.Integration;
-using unvell.ReoGrid.Actions;
 
 namespace ReoGrid.Mvvm
 {
@@ -22,12 +19,11 @@ namespace ReoGrid.Mvvm
 
         #region [Fields]
 
-        private ReoGridControl _ReoGridControl;
-        private unvell.ReoGrid.Worksheet _Worksheet;
-        private Type _RecordModelType;
-        private ObservableCollection<IRecordModel> _Records;
-        private List<int> _ColumnWidthList;
-        private List<int> _RowHeightList;
+        private readonly ReoGridControl _reoGridControl;
+        private readonly Worksheet _worksheet;
+        private readonly Type _recordModelType;
+        private List<int> _columnWidthList;
+        private List<int> _rowHeightList;
 
         #endregion
 
@@ -35,37 +31,23 @@ namespace ReoGrid.Mvvm
         /// <summary>
         /// IRecordModel Collection
         /// </summary>
-        public ObservableCollection<IRecordModel> Records
-        {
-            get
-            {
-                return _Records;
-            }
-            set
-            {
-                _Records = value;
-            }
-        }
+        public ObservableCollection<IRecordModel> Records { get; set; }
 
-        public delegate bool? BeforeChangeRecordEventHander(IRecordModel record, PropertyInfo propertyInfo, object newProperyValue);
-        public event BeforeChangeRecordEventHander OnBeforeChangeRecord;
+        public delegate bool? BeforeChangeRecordEventHandler(IRecordModel record, PropertyInfo propertyInfo, object newPropertyValue);
+        public event BeforeChangeRecordEventHandler OnBeforeChangeRecord;
 
-
-        public delegate bool? BeforeDeleteRecordEventHander(IRecordModel record, int row);
-        public event BeforeDeleteRecordEventHander OnBeforeDeleteRecord;
-
-        public delegate void BeforeCellEditEventHander(object sender, unvell.ReoGrid.Events.CellBeforeEditEventArgs e);
-        public event BeforeCellEditEventHander OnBeforeCellEdit;
+        public delegate void BeforeCellEditEventHandler(object sender, CellBeforeEditEventArgs e);
+        public event BeforeCellEditEventHandler OnBeforeCellEdit;
         #endregion
 
         #region [Constructor]
 
         public WorksheetModel(ReoGridControl reoGridControl, Type recordModelType)
         {
-            _ReoGridControl = reoGridControl;
-            _Worksheet = reoGridControl.CurrentWorksheet;
-            _RecordModelType = recordModelType;
-            _Records = new ObservableCollection<IRecordModel>();
+            _reoGridControl = reoGridControl;
+            _worksheet = reoGridControl.CurrentWorksheet;
+            _recordModelType = recordModelType;
+            Records = new ObservableCollection<IRecordModel>();
 
             InitWorksheet();
         }
@@ -73,11 +55,11 @@ namespace ReoGrid.Mvvm
 
         public WorksheetModel(ReoGridControl reoGridControl, Type recordModelType, ObservableCollection<IRecordModel> records)
         {
-            _ReoGridControl = reoGridControl;
-            _Worksheet = reoGridControl.CurrentWorksheet;
-            _Records = records;
-            _RecordModelType = recordModelType;
-            _Records.CollectionChanged += Records_CollectionChanged;
+            _reoGridControl = reoGridControl;
+            _worksheet = reoGridControl.CurrentWorksheet;
+            Records = records;
+            _recordModelType = recordModelType;
+            Records.CollectionChanged += Records_CollectionChanged;
 
             InitWorksheet();
         }
@@ -91,24 +73,20 @@ namespace ReoGrid.Mvvm
         /// </summary>
         private void InitWorksheet()
         {
-            
-
-            WorksheetAttribute classAttribue = _RecordModelType.GetCustomAttribute(typeof(WorksheetAttribute)) as WorksheetAttribute;
-            if (classAttribue != null)
+            if (_recordModelType.GetCustomAttribute(typeof(WorksheetAttribute)) is WorksheetAttribute classAttribue)
             {
-                _Worksheet.Name = classAttribue.Title;
+                _worksheet.Name = classAttribue.Title;
             }
             else
             {
-                _Worksheet.Name = _RecordModelType.Name;
+                _worksheet.Name = _recordModelType.Name;
             }
 
-            PropertyInfo[] properties = _RecordModelType.GetProperties();
-            Dictionary<PropertyInfo, ColumnHeaderAttribute> ColHeaderAttributeDict = new Dictionary<PropertyInfo, ColumnHeaderAttribute>();
-            foreach (PropertyInfo property in properties)
+            var properties = _recordModelType.GetProperties();
+            var ColHeaderAttributeDict = new Dictionary<PropertyInfo, ColumnHeaderAttribute>();
+            foreach (var property in properties)
             {
-                ColumnHeaderAttribute headerAttribute = property.GetCustomAttribute(typeof(ColumnHeaderAttribute)) as ColumnHeaderAttribute;
-                if (headerAttribute != null && headerAttribute.IsVisible) //filter invisible item
+                if (property.GetCustomAttribute(typeof(ColumnHeaderAttribute)) is ColumnHeaderAttribute headerAttribute && headerAttribute.IsVisible) //filter invisible item
                 {
                     ColHeaderAttributeDict.Add(property, headerAttribute);
                 }
@@ -122,34 +100,35 @@ namespace ReoGrid.Mvvm
             }
             ColHeaderAttributeDict = ColHeaderAttributeDict.OrderBy(one => one.Value.Index).ToDictionary(one => one.Key, one => one.Value); // order by index
             // Re-Set Index
-            for (int i = 0; i < ColHeaderAttributeDict.Keys.Count; i++)
+            for (var i = 0; i < ColHeaderAttributeDict.Keys.Count; i++)
             {
                 var key = ColHeaderAttributeDict.Keys.ElementAt(i);
                 ColHeaderAttributeDict[key].Index = i;
             }
 
            
-            _Worksheet.Columns = ColHeaderAttributeDict.Count;
+            _worksheet.Columns = ColHeaderAttributeDict.Count;
            
 
-            RangePosition rangePosition = new RangePosition();
-
-            rangePosition.Cols = 1;
-            rangePosition.Row = 0;
-            rangePosition.Rows = _Worksheet.RowCount;
-
-            for (int i = 0; i < properties.Count(); i++)
+            var rangePosition = new RangePosition
             {
-                PropertyInfo property = properties[i];
+                Cols = 1,
+                Row = 0,
+                Rows = _worksheet.RowCount
+            };
+
+            for (var i = 0; i < properties.Count(); i++)
+            {
+                var property = properties[i];
                 var attribute = property.GetCustomAttribute(typeof(FormatAttributeBase));
                 if (attribute == null)
                 {
                     continue;
                 }
-                IFormatArgs formatArgs = attribute as IFormatArgs;
-                if (formatArgs != null)
+
+                if (attribute is IFormatArgs formatArgs)
                 {
-                    ColumnHeaderAttribute headerAttribute = (from key in ColHeaderAttributeDict.Keys
+                    var headerAttribute = (from key in ColHeaderAttributeDict.Keys
                              where key.Equals(property)
                              select ColHeaderAttributeDict[property]).FirstOrDefault();
 
@@ -163,8 +142,8 @@ namespace ReoGrid.Mvvm
                                 break;
                             case CellDataFormatFlag.Number:
                                 {
-                                    NumberFormatAttribute numberFormatAttribute = formatArgs as NumberFormatAttribute;
-                                    NumberDataFormatter.NumberFormatArgs numberFormatter = new NumberDataFormatter.NumberFormatArgs();
+                                    var numberFormatAttribute = formatArgs as NumberFormatAttribute;
+                                    var numberFormatter = new NumberDataFormatter.NumberFormatArgs();
                                     if (numberFormatAttribute.DecimalPlaces != short.MaxValue)
                                     {
                                         numberFormatter.DecimalPlaces = numberFormatAttribute.DecimalPlaces;
@@ -173,17 +152,19 @@ namespace ReoGrid.Mvvm
                                     numberFormatter.UseSeparator = numberFormatAttribute.UseSeparator;
                                     numberFormatter.CustomNegativePrefix = numberFormatAttribute.CustomNegativePrefix;
                                     numberFormatter.CustomNegativePostfix = numberFormatAttribute.CustomNegativePostfix;
-                                    _Worksheet.SetRangeDataFormat(rangePosition, CellDataFormatFlag.Number, numberFormatter);
+                                    _worksheet.SetRangeDataFormat(rangePosition, CellDataFormatFlag.Number, numberFormatter);
                                     //_ReoGridControl.DoAction(new SetRangeDataFormatAction(rangePosition, CellDataFormatFlag.Number, numberFormatter));
                                     break;
                                 }
                             case CellDataFormatFlag.DateTime:
                                 {
-                                    DateTimeFormatAttribute dateTimeFormatAttribute = formatArgs as DateTimeFormatAttribute;
-                                    DateTimeDataFormatter.DateTimeFormatArgs dateTimeFormatArgs = new DateTimeDataFormatter.DateTimeFormatArgs();
-                                    dateTimeFormatArgs.Format = dateTimeFormatAttribute.Format;
-                                    dateTimeFormatArgs.CultureName = dateTimeFormatAttribute.CultureName;
-                                    _Worksheet.SetRangeDataFormat(rangePosition, CellDataFormatFlag.DateTime, dateTimeFormatArgs);
+                                    var dateTimeFormatAttribute = formatArgs as DateTimeFormatAttribute;
+                                    var dateTimeFormatArgs = new DateTimeDataFormatter.DateTimeFormatArgs
+                                        {
+                                            Format = dateTimeFormatAttribute.Format,
+                                            CultureName = dateTimeFormatAttribute.CultureName
+                                        };
+                                    _worksheet.SetRangeDataFormat(rangePosition, CellDataFormatFlag.DateTime, dateTimeFormatArgs);
                                     break;
                                 }
                             case CellDataFormatFlag.Percent:
@@ -203,52 +184,45 @@ namespace ReoGrid.Mvvm
                 
             }
 
-            _ColumnWidthList = new List<int>();
-            _RowHeightList = new List<int>();
+            _columnWidthList = new List<int>();
+            _rowHeightList = new List<int>();
 
-            for (int i = 0; i < ColHeaderAttributeDict.Count; i++)
+            for (var i = 0; i < ColHeaderAttributeDict.Count; i++)
             {
-                ColumnHeaderAttribute headerAttribute = ColHeaderAttributeDict.ElementAt(i).Value;
+                var headerAttribute = ColHeaderAttributeDict.ElementAt(i).Value;
 
-                if (string.IsNullOrEmpty(headerAttribute.Text))
-                {
-                    _Worksheet.ColumnHeaders[i].Text = ColHeaderAttributeDict.ElementAt(i).Key.Name;
-                }
-                else
-                {
-                    _Worksheet.ColumnHeaders[i].Text = headerAttribute.Text;
-                }
+                _worksheet.ColumnHeaders[i].Text = string.IsNullOrEmpty(headerAttribute.Text) ? ColHeaderAttributeDict.ElementAt(i).Key.Name : headerAttribute.Text;
                 if (headerAttribute.Width <= 0)
                 {
-                    _Worksheet.ColumnHeaders[i].IsAutoWidth = true;
+                    _worksheet.ColumnHeaders[i].IsAutoWidth = true;
                     
                 }
                 else
                 {
-                    _Worksheet.ColumnHeaders[i].Width = (ushort)headerAttribute.Width;
+                    _worksheet.ColumnHeaders[i].Width = (ushort)headerAttribute.Width;
                 }
-                _Worksheet.ColumnHeaders[i].IsVisible = true;
-                _Worksheet.ColumnHeaders[i].Tag = ColHeaderAttributeDict.ElementAt(i).Key; // Tag stores PropertyInfo of Model
-                _ColumnWidthList.Add(_Worksheet.ColumnHeaders[i].Width); // store column width
+                _worksheet.ColumnHeaders[i].IsVisible = true;
+                _worksheet.ColumnHeaders[i].Tag = ColHeaderAttributeDict.ElementAt(i).Key; // Tag stores PropertyInfo of Model
+                _columnWidthList.Add(_worksheet.ColumnHeaders[i].Width); // store column width
             }
 
             //stroe row height
-            for (int i = 0; i < _Worksheet.Rows; i++)
+            for (var i = 0; i < _worksheet.Rows; i++)
             {
-                _RowHeightList.Add(_Worksheet.RowHeaders[i].Height);
+                _rowHeightList.Add(_worksheet.RowHeaders[i].Height);
             }
 
             // load data
             LoadRecords();
 
 
-            _Worksheet.BeforeCellEdit += Worksheet_BeforeCellEdit;
-            _Worksheet.CellDataChanged += Worksheet_CellDataChanged;
-            _Worksheet.RangeDataChanged += Worksheet_RangeDataChanged;
-            _Worksheet.AfterPaste += Worksheet_AfterPaste;
+            _worksheet.BeforeCellEdit += Worksheet_BeforeCellEdit;
+            _worksheet.CellDataChanged += Worksheet_CellDataChanged;
+            _worksheet.RangeDataChanged += Worksheet_RangeDataChanged;
+            _worksheet.AfterPaste += Worksheet_AfterPaste;
 
-            _Worksheet.RowsHeightChanged += Worksheet_RowsHeightChanged;
-            _Worksheet.ColumnsWidthChanged += Worksheet_ColumnsWidthChanged;
+            _worksheet.RowsHeightChanged += Worksheet_RowsHeightChanged;
+            _worksheet.ColumnsWidthChanged += Worksheet_ColumnsWidthChanged;
         }
         #endregion
 
@@ -263,13 +237,13 @@ namespace ReoGrid.Mvvm
             // Exception: Process is terminated due to StackOverflowException.
             // _Worksheet.ColumnHeaders[e.Index].Width = (ushort)e.Width;
 
-            if (e.Index < _ColumnWidthList.Count)
+            if (e.Index < _columnWidthList.Count)
             {
-                _ColumnWidthList[e.Index] = e.Width;
+                _columnWidthList[e.Index] = e.Width;
             }
             else
             {
-                _ColumnWidthList.Add(e.Width);
+                _columnWidthList.Add(e.Width);
             }
         }
         #endregion
@@ -285,13 +259,13 @@ namespace ReoGrid.Mvvm
             // Exception: Process is terminated due to StackOverflowException.
             // _Worksheet.RowHeaders[e.Index].Height = (ushort)e.Height;
 
-            if (e.Index < _RowHeightList.Count)
+            if (e.Row < _rowHeightList.Count)
             {
-                _RowHeightList[e.Index] = e.Height;
+                _rowHeightList[e.Row] = e.Height;
             }
             else
             {
-                _RowHeightList.Add(e.Height);
+                _rowHeightList.Add(e.Height);
             }
         }
         #endregion
@@ -302,13 +276,11 @@ namespace ReoGrid.Mvvm
         /// </summary>
         private void LoadRecords()
         {
-            if (_Records.Count > 0)
+            if (Records.Count <= 0) return;
+            for (var rowIndex = 0; rowIndex < Records.Count; rowIndex++)
             {
-                for (int rowIndex = 0; rowIndex < _Records.Count; rowIndex++)
-                {
-                    IRecordModel record = _Records.ElementAt(rowIndex);
-                    AddOrUpdateOneFromRecord(rowIndex, record);
-                }
+                var record = Records.ElementAt(rowIndex);
+                AddOrUpdateOneFromRecord(rowIndex, record);
             }
         }
         #endregion
@@ -328,7 +300,7 @@ namespace ReoGrid.Mvvm
                     {
                         foreach (IRecordModel item in e.NewItems)
                         {
-                            AddOrUpdateOneFromRecord(_Records.Count - 1, item);
+                            AddOrUpdateOneFromRecord(Records.Count - 1, item);
                         }
                         break;
                     }
@@ -336,32 +308,32 @@ namespace ReoGrid.Mvvm
                     {
                         foreach (IRecordModel item in e.OldItems)
                         {
-                            int rowIndex = item.RowIndex;
-                            _Worksheet.DeleteRows(rowIndex, 1);
+                            var rowIndex = item.RowIndex;
+                            _worksheet.DeleteRows(rowIndex, 1);
 
-                            for (int i = rowIndex; i < _Records.Count; i++)
+                            for (var i = rowIndex; i < Records.Count; i++)
                             {
-                                _Records.ElementAt(rowIndex).RowIndex = rowIndex;
+                                Records.ElementAt(rowIndex).RowIndex = rowIndex;
                             }
                         }
                         break;
                     }
                 case System.Collections.Specialized.NotifyCollectionChangedAction.Replace:
                     {
-                        for (int i = 0; i < e.NewItems.Count; i++)
+                        for (var i = 0; i < e.NewItems.Count; i++)
                         {
-                            IRecordModel item = e.NewItems[i] as IRecordModel;
-                            int rowIndex = (e.OldItems[i] as IRecordModel).RowIndex;
+                            var item = e.NewItems[i] as IRecordModel;
+                            var rowIndex = (e.OldItems[i] as IRecordModel).RowIndex;
                             AddOrUpdateOneFromRecord(rowIndex, item);
                         }
                         break;
                     }
                 case System.Collections.Specialized.NotifyCollectionChangedAction.Move:
                     {
-                        for (int i = 0; i < _Records.Count; i++)
+                        for (var i = 0; i < Records.Count; i++)
                         {
-                            IRecordModel item = _Records.ElementAt(i);
-                            int rowIndex = item.RowIndex;
+                            var item = Records.ElementAt(i);
+                            var rowIndex = item.RowIndex;
                             if (rowIndex != i)
                             {
                                 AddOrUpdateOneFromRecord(i, item);
@@ -371,7 +343,7 @@ namespace ReoGrid.Mvvm
                     }
                 case System.Collections.Specialized.NotifyCollectionChangedAction.Reset:
                     {
-                        _Worksheet.DeleteRows(0, _Worksheet.UsedRange.Rows);
+                        _worksheet.DeleteRows(0, _worksheet.UsedRange.Rows);
                         break;
                     }
                 default:
@@ -386,35 +358,29 @@ namespace ReoGrid.Mvvm
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="e"></param>
-        private void Worksheet_BeforeCellEdit(object sender, unvell.ReoGrid.Events.CellBeforeEditEventArgs e)
+        private void Worksheet_BeforeCellEdit(object sender, CellBeforeEditEventArgs e)
         {
 
-            int currentColIndex = e.Cell.Column;
-            int currentRowIndex = e.Cell.Row;
+            var currentColIndex = e.Cell.Column;
+            var currentRowIndex = e.Cell.Row;
             
-            if (_Worksheet.ColumnHeaders[currentColIndex] != null)
+            if (_worksheet.ColumnHeaders[currentColIndex] != null)
             {
-                PropertyInfo propertyInfo = (PropertyInfo)_Worksheet.ColumnHeaders[currentColIndex].Tag;
+                var propertyInfo = (PropertyInfo)_worksheet.ColumnHeaders[currentColIndex].Tag;
                 if (propertyInfo.PropertyType.BaseType == typeof(Enum))
                 {
                     // get enum values
-                    List<object> enumValues = new List<object>();
-                    foreach (var item in System.Enum.GetValues(propertyInfo.PropertyType))
-                    {
-                        enumValues.Add(item);
-                    }
+                    var enumValues = Enum.GetValues(propertyInfo.PropertyType).Cast<object>().ToList();
                     SimulateComboBox(enumValues, e);
                 }
                 else if (propertyInfo.PropertyType == typeof(bool))
                 {
-                    List<object> values = new List<object>() { Boolean.TrueString, Boolean.FalseString };
+                    var values = new List<object>() { bool.TrueString, bool.FalseString };
                     SimulateComboBox(values, e);
                 }
             }
-            if (OnBeforeCellEdit != null)
-            {
-                OnBeforeCellEdit(sender, e);
-            }
+
+            OnBeforeCellEdit?.Invoke(sender, e);
         }
         #endregion
 
@@ -424,15 +390,13 @@ namespace ReoGrid.Mvvm
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="e"></param>
-        private void Worksheet_CellDataChanged(object sender, unvell.ReoGrid.Events.CellEventArgs e)
+        private void Worksheet_CellDataChanged(object sender, CellEventArgs e)
         {
-            if (e.Cell != null)
-            {
-                int row = e.Cell.Row;
-                int col = e.Cell.Column;
+            if (e.Cell == null) return;
+            var row = e.Cell.Row;
+            var col = e.Cell.Column;
                 
-                AddOrUpdateOneFromUi(row, col, col);
-            }
+            AddOrUpdateOneFromUi(row, col, col);
         }
         #endregion
 
@@ -442,21 +406,20 @@ namespace ReoGrid.Mvvm
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="e"></param>
-        private void Worksheet_AfterPaste(object sender, unvell.ReoGrid.Events.RangeEventArgs e)
+        private void Worksheet_AfterPaste(object sender, RangeEventArgs e)
         {
-            RangePosition range = e.Range;
+            var range = e.Range;
             AddOrUpdateRecords(range);
         }
         #endregion
 
         #region [AddOrUpdateRecords] Add or Update mulit records
         /// <summary>
-        /// Add or Update mulit records
         /// </summary>
         /// <param name="range">edit range</param>
         private void AddOrUpdateRecords(RangePosition range)
         {
-            for (int rowIndex = range.StartPos.Row; rowIndex <= range.EndRow; rowIndex++)
+            for (var rowIndex = range.StartPos.Row; rowIndex <= range.EndRow; rowIndex++)
             {
                 AddOrUpdateOneFromUi(rowIndex, range.StartPos.Col, range.EndPos.Col);
             }
@@ -474,20 +437,20 @@ namespace ReoGrid.Mvvm
         {
             IRecordModel record;
 
-            if (rowIndex < _Records.Count) // update record
+            if (rowIndex < Records.Count) // update record
             {
-                record = _Records.ElementAt(rowIndex);
+                record = Records.ElementAt(rowIndex);
             }
             else // insert record
             {
-                record = Activator.CreateInstance(_RecordModelType) as IRecordModel;
+                record = Activator.CreateInstance(_recordModelType) as IRecordModel;
                 record.RowIndex = rowIndex;
             }
 
-            for (int colIndex = startCol; colIndex <= endCol; colIndex++)
+            for (var colIndex = startCol; colIndex <= endCol; colIndex++)
             {
-                PropertyInfo propertyInfo = (PropertyInfo)_Worksheet.ColumnHeaders[colIndex].Tag;
-                object cellData = _Worksheet.GetCellData(rowIndex, colIndex);
+                var propertyInfo = (PropertyInfo)_worksheet.ColumnHeaders[colIndex].Tag;
+                var cellData = _worksheet.GetCellData(rowIndex, colIndex);
                 object value = null;
                 if (cellData != null)
                 {
@@ -524,10 +487,10 @@ namespace ReoGrid.Mvvm
 
                 if (OnBeforeChangeRecord != null)
                 {
-                    bool? isCancel = OnBeforeChangeRecord(record, propertyInfo, value);
+                    var isCancel = OnBeforeChangeRecord(record, propertyInfo, value);
                     if (isCancel.HasValue && isCancel.Value) // if has value and cancel is true, then undo the change
                     {
-                        _Worksheet.SetCellData(rowIndex, colIndex, propertyInfo.GetValue(record));
+                        _worksheet.SetCellData(rowIndex, colIndex, propertyInfo.GetValue(record));
                         //if (rowIndex < _Records.Count)
                         //{
                         //    _Worksheet.SetCellData(rowIndex, colIndex, propertyInfo.GetValue(record));
@@ -541,9 +504,9 @@ namespace ReoGrid.Mvvm
                 }
                 propertyInfo.SetValue(record, value);
             }
-            if (rowIndex >= _Records.Count)
+            if (rowIndex >= Records.Count)
             {
-                _Records.Add(record);
+                Records.Add(record);
             }
         }
         #endregion
@@ -556,16 +519,16 @@ namespace ReoGrid.Mvvm
         /// <param name="record"></param>
         private void AddOrUpdateOneFromRecord(int rowIndex, IRecordModel record)
         {
-            _Worksheet.SuspendDataChangedEvents();
+            _worksheet.SuspendDataChangedEvents();
             record.RowIndex = rowIndex; // set row index
-            for (int colIndex = 0; colIndex < _Worksheet.Columns; colIndex++)
+            for (var colIndex = 0; colIndex < _worksheet.Columns; colIndex++)
             {
-                CellPosition currentCellPos = new CellPosition(rowIndex, colIndex);
-                if (_Worksheet.ColumnHeaders[colIndex].Tag != null)
+                var currentCellPos = new CellPosition(rowIndex, colIndex);
+                if (_worksheet.ColumnHeaders[colIndex].Tag != null)
                 {
-                    PropertyInfo propertyInfo = (PropertyInfo)_Worksheet.ColumnHeaders[colIndex].Tag;
-                    object data = propertyInfo.GetValue(record);
-                    _Worksheet.SetCellData(currentCellPos, data);
+                    var propertyInfo = (PropertyInfo)_worksheet.ColumnHeaders[colIndex].Tag;
+                    var data = propertyInfo.GetValue(record);
+                    _worksheet.SetCellData(currentCellPos, data);
                 }
                 else
                 {
@@ -574,7 +537,7 @@ namespace ReoGrid.Mvvm
 #endif
                 }
             }
-            _Worksheet.ResumeDataChangedEvents();
+            _worksheet.ResumeDataChangedEvents();
         }
         #endregion
 
@@ -584,35 +547,32 @@ namespace ReoGrid.Mvvm
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="e"></param>
-        private void Worksheet_RangeDataChanged(object sender, unvell.ReoGrid.Events.RangeEventArgs e)
+        private void Worksheet_RangeDataChanged(object sender, RangeEventArgs e)
         {
-            bool isDeleteRows = false;
-            if (e.Range.Cols >= _Worksheet.UsedRange.Cols) //delete whole rows
+            var isDeleteRows = false;
+            if (e.Range.Cols >= _worksheet.UsedRange.Cols) //delete whole rows
             {
                 isDeleteRows = true;
-                for (int rowIndex = e.Range.StartPos.Row; rowIndex <= e.Range.EndRow; rowIndex++)
+                for (var rowIndex = e.Range.StartPos.Row; rowIndex <= e.Range.EndRow; rowIndex++)
                 {
-                    IRecordModel recordModel = (from one in _Records where one.RowIndex == rowIndex select one).FirstOrDefault();
-                    if (recordModel != null)
-                    {
-                        _Records.CollectionChanged -= Records_CollectionChanged;
-                        _Records.Remove(recordModel);
-                        _Records.CollectionChanged += Records_CollectionChanged;
-                    }
+                    var recordModel = (from one in Records where one.RowIndex == rowIndex select one).FirstOrDefault();
+                    if (recordModel == null) continue;
+                    Records.CollectionChanged -= Records_CollectionChanged;
+                    Records.Remove(recordModel);
+                    Records.CollectionChanged += Records_CollectionChanged;
                 }
-                if (isDeleteRows)
-                {
-                    _Worksheet.DeleteRows(e.Range.StartPos.Row, e.Range.Rows);
 
-                    for (int i = e.Range.StartPos.Row; i < _Records.Count; i++)
-                    {
-                        _Records.ElementAt(i).RowIndex = i;
-                    }
+                if (!isDeleteRows) return;
+                _worksheet.DeleteRows(e.Range.StartPos.Row, e.Range.Rows);
+
+                for (var i = e.Range.StartPos.Row; i < Records.Count; i++)
+                {
+                    Records.ElementAt(i).RowIndex = i;
                 }
             }
             else //delete parts of rows
             {
-                for (int rowIndex = e.Range.StartPos.Row; rowIndex <= e.Range.EndRow; rowIndex++)
+                for (var rowIndex = e.Range.StartPos.Row; rowIndex <= e.Range.EndRow; rowIndex++)
                 {
                     AddOrUpdateOneFromUi(rowIndex, e.Range.StartPos.Col, e.Range.EndCol);
                 }
@@ -623,43 +583,45 @@ namespace ReoGrid.Mvvm
         #region [SimulateComboBox] Simulate ComboBox
         private void SimulateComboBox(List<object> list, CellBeforeEditEventArgs e)
         {
-            int currentColIndex = e.Cell.Column;
-            int currentRowIndex = e.Cell.Row;
+            var currentColIndex = e.Cell.Column;
+            var currentRowIndex = e.Cell.Row;
             
-            Window window = new Window();
-            WrapPanel wrapPanel = new WrapPanel();
-            ListBox listBox = new ListBox();
+            var window = new Window();
+            var wrapPanel = new WrapPanel();
+            var listBox = new ListBox();
             listBox.SetValue( ScrollViewer.HorizontalScrollBarVisibilityProperty, ScrollBarVisibility.Hidden);
             listBox.SetValue(ScrollViewer.VerticalScrollBarVisibilityProperty, ScrollBarVisibility.Hidden);
-            listBox.Width = _ColumnWidthList.ElementAt(e.Cell.Column);
+            listBox.Width = _columnWidthList.ElementAt(e.Cell.Column);
 
-            for (int i = 0; i < list.Count; i++)
+            for (var i = 0; i < list.Count; i++)
             {
                 var item = list.ElementAt(i);
-                ListBoxItem listBoxItem = new ListBoxItem();
-                listBoxItem.Content = item;
+                var listBoxItem = new ListBoxItem
+                {
+                    Content = item
+                };
                 listBox.Items.Add(listBoxItem);
             }
-            listBox.RenderTransform = new ScaleTransform(_Worksheet.ScaleFactor, _Worksheet.ScaleFactor);
+            listBox.RenderTransform = new ScaleTransform(_worksheet.ScaleFactor, _worksheet.ScaleFactor);
 
-            listBox.MouseDoubleClick += (object obj, MouseButtonEventArgs eventArgs) => {
-                e.EditText = (listBox.SelectedValue as ListBoxItem).Content.ToString();
+            listBox.MouseDoubleClick += (obj, eventArgs) => {
+                e.EditText = (listBox.SelectedValue as ListBoxItem)?.Content.ToString();
                 window.DialogResult = true;
             };
             wrapPanel.Children.Add(listBox);
-            Point point = new Point();
-            for (int rowIndex = 0; rowIndex <= currentRowIndex + 1; rowIndex++)
+            var point = new Point();
+            for (var rowIndex = 0; rowIndex <= currentRowIndex + 1; rowIndex++)
             {
-                point.Y += (int)(_RowHeightList.ElementAt(rowIndex) * _Worksheet.ScaleFactor);
+                point.Y += (int)(_rowHeightList.ElementAt(rowIndex) * _worksheet.ScaleFactor);
             }
-            for (int colIndex = 0; colIndex < currentColIndex; colIndex++)
+            for (var colIndex = 0; colIndex < currentColIndex; colIndex++)
             {
-                point.X += (int)(_ColumnWidthList.ElementAt(colIndex) * _Worksheet.ScaleFactor);
+                point.X += (int)(_columnWidthList.ElementAt(colIndex) * _worksheet.ScaleFactor);
             }
-            point.X += (int)(_Worksheet.RowHeaderWidth * _Worksheet.ScaleFactor);
-            Point screenPoint = _ReoGridControl.PointToScreen(point);
+            point.X += (int)(_worksheet.RowHeaderWidth * _worksheet.ScaleFactor);
+            var screenPoint = _reoGridControl.PointToScreen(point);
 
-            window.Width = _Worksheet.ColumnHeaders[e.Cell.Column].Width;
+            window.Width = _worksheet.ColumnHeaders[e.Cell.Column].Width;
             window.WindowStyle = WindowStyle.None;
             window.ResizeMode = ResizeMode.NoResize;
             window.BorderThickness = new Thickness(0);
@@ -668,10 +630,10 @@ namespace ReoGrid.Mvvm
             window.WindowStartupLocation = WindowStartupLocation.Manual;
             window.Left = screenPoint.X;
             window.Top = screenPoint.Y;
-            window.Loaded += (object win, RoutedEventArgs routedEventArgs) =>
+            window.Loaded += (win, routedEventArgs) =>
             {
-                wrapPanel.Width = listBox.RenderSize.Width * _Worksheet.ScaleFactor;
-                wrapPanel.Height = listBox.RenderSize.Height * _Worksheet.ScaleFactor;
+                wrapPanel.Width = listBox.RenderSize.Width * _worksheet.ScaleFactor;
+                wrapPanel.Height = listBox.RenderSize.Height * _worksheet.ScaleFactor;
             };
             window.ShowDialog();
         }
@@ -681,12 +643,12 @@ namespace ReoGrid.Mvvm
 
         #region [Public Methods]
 
-        #region [UpadteRecord] Update one record
+        #region [UpdateRecord] Update one record
         /// <summary>
         /// Update one record
         /// </summary>
         /// <param name="recordModel"></param>
-        public void UpadteRecord(IRecordModel recordModel)
+        public void UpdateRecord(IRecordModel recordModel)
         {
             AddOrUpdateOneFromRecord(recordModel.RowIndex, recordModel);
         }

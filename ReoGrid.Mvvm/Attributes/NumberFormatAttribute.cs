@@ -1,21 +1,11 @@
-﻿using ReoGrid.Mvvm.Interfaces;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using unvell.ReoGrid.DataFormat;
+﻿using unvell.ReoGrid.DataFormat;
 using static unvell.ReoGrid.DataFormat.NumberDataFormatter;
 
 namespace ReoGrid.Mvvm.Attributes
 {
     public class NumberFormatAttribute: FormatAttributeBase
     {
-        public override CellDataFormatFlag CellDataFormatFlag {
-            get{
-                return CellDataFormatFlag.Number;
-            }
-        }
+        public override CellDataFormatFlag CellDataFormatFlag => CellDataFormatFlag.Number;
 
         /// <summary>
         /// Get or set the digis places for number.

@@ -1,6 +1,5 @@
 ﻿using ReoGrid.Mvvm.Demo.Views;
 using Prism.Ioc;
-using Prism.Modularity;
 using System.Windows;
 
 namespace ReoGrid.Mvvm.Demo

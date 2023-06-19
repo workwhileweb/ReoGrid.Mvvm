@@ -62,9 +62,7 @@
     <Compile Include="WorksheetModel.cs" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="unvell.ReoGridWPF.dll">
-      <Version>3.0.0</Version>
-    </PackageReference>
+    <None Include="packages.config" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

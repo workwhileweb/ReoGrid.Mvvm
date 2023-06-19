@@ -1,16 +1,11 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using ReoGrid.Mvvm;
 using ReoGrid.Mvvm.Attributes;
 using ReoGrid.Mvvm.Interfaces;
 using unvell.ReoGrid.DataFormat;
 
 namespace ReoGrid.Mvvm.Demo.Models
 {
-    [WorksheetAttribute(Title = "Books")]
+    [Worksheet(Title = "Books")]
     public class Book: IRecordModel
     {
         [ColumnHeader(Index = 10, IsVisible = false)]
@@ -34,14 +29,13 @@ namespace ReoGrid.Mvvm.Demo.Models
 
         [DateTimeFormat( CultureName = "en-US")]
         [ColumnHeader(Index = 45, Text = "Publish Date", Width = 200)]
-        public DateTime Pubdate { get; set; }
+        public DateTime Publish { get; set; }
 
         public int RowIndex { get; set; }
     }
 
     public enum BindingType
     {
-        Hardcover,
         Hardback
     }
 }

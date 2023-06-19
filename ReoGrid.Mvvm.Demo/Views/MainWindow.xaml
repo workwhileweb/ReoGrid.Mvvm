@@ -14,17 +14,18 @@
     </i:Interaction.Triggers>
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="1*"/>
-            <RowDefinition Height="4*"/>
+            <RowDefinition Height="30"/>
+            <RowDefinition Height="7*"/>
         </Grid.RowDefinitions>
-        <StackPanel Grid.Row="0" Orientation="Horizontal">
 
-            <Button Width="50" Height="40" Margin="10 0" Command="{Binding AddRecordCommand}">Add</Button>
-            <Button Width="50" Height="40" Margin="10 0" Command="{Binding DeleteRecordCommand}">Delete</Button>
-            <Button Width="50" Height="40" Margin="10 0" Command="{Binding MoveRecordCommand}">Move</Button>
-            <Button Width="50" Height="40" Margin="10 0" Command="{Binding EditRecordCommand}">Edit</Button>
-            <Button Width="100" Height="40" Margin="10 0" Command="{Binding GetFromUiCommand}">Get From UI</Button>
+        <StackPanel Grid.Row="0" Orientation="Horizontal" >
+            <Button Width="50" Margin="10 0" Command="{Binding AddRecordCommand}">Add</Button>
+            <Button Width="50" Margin="10 0" Command="{Binding DeleteRecordCommand}">Delete</Button>
+            <Button Width="50" Margin="10 0" Command="{Binding MoveRecordCommand}">Move</Button>
+            <Button Width="50" Margin="10 0" Command="{Binding EditRecordCommand}">Edit</Button>
+            <Button Width="90" Margin="10 0" Command="{Binding GetFromUiCommand}">Get From UI</Button>
         </StackPanel>
+
         <Grid Grid.Row="1">
             <reoGrid:ReoGridControl Name="ReoGrid" ></reoGrid:ReoGridControl>
         </Grid>

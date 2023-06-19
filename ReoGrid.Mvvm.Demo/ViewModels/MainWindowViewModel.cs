@@ -7,7 +7,6 @@ using System;
 using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Controls;
-using Unity;
 using unvell.ReoGrid;
 
 namespace ReoGrid.Mvvm.Demo.ViewModels
@@ -16,17 +15,15 @@ namespace ReoGrid.Mvvm.Demo.ViewModels
     {
         #region [Fields]
         private string _title = "ReoGrid.Mvvm.Demo";
-
-        private ObservableCollection<IRecordModel> _Books;
-        private WorksheetModel _WorksheetModel;
+        private ObservableCollection<IRecordModel> _books;
+        private WorksheetModel _worksheetModel;
         #endregion
 
         #region [Properties]
-
         public string Title
         {
-            get { return _title; }
-            set { SetProperty(ref _title, value); }
+            get => _title;
+            set => SetProperty(ref _title, value);
         }
 
         public DelegateCommand<ReoGridControl> LoadedCommand { get; set; }
@@ -38,7 +35,6 @@ namespace ReoGrid.Mvvm.Demo.ViewModels
 
         #endregion
 
-
         public MainWindowViewModel(IRegionManager regionManager)
         {
             InitBooks();
@@ -47,18 +43,20 @@ namespace ReoGrid.Mvvm.Demo.ViewModels
 
         private void InitBooks()
         {
-            _Books = new ObservableCollection<IRecordModel>();
-            for (int i = 0; i < 10; i++)
+            _books = new ObservableCollection<IRecordModel>();
+            for (var i = 0; i < 10; i++)
             {
-                Book book = new Book();
-                book.Id = i;
-                book.Title = string.Format("Title {0}", i);
-                book.Author = string.Format("Author {0}", i);
-                book.BindingType = BindingType.Hardback;
-                book.IsOnSale = true;
-                book.Price = (decimal)(i * 10.1);
-                book.Pubdate = DateTime.Now;
-                _Books.Add(book);
+                var book = new Book
+                {
+                    Id = i,
+                    Title = $"Title {i}",
+                    Author = $"Author {i}",
+                    BindingType = BindingType.Hardback,
+                    IsOnSale = true,
+                    Price = (decimal)(i * 10.1),
+                    Publish = DateTime.Now
+                };
+                _books.Add(book);
             }
         }
 
@@ -74,77 +72,74 @@ namespace ReoGrid.Mvvm.Demo.ViewModels
 
         private void OnLoadedCommand(ReoGridControl reoGridControl)
         {
-            _WorksheetModel = new WorksheetModel(reoGridControl, typeof(Book), _Books);
-            _WorksheetModel.OnBeforeChangeRecord += WorksheetModel_OnBeforeChangeRecord;
+            _worksheetModel = new WorksheetModel(reoGridControl, typeof(Book), _books);
+            _worksheetModel.OnBeforeChangeRecord += WorksheetModel_OnBeforeChangeRecord;
         }
 
-        private bool? WorksheetModel_OnBeforeChangeRecord(IRecordModel record, System.Reflection.PropertyInfo propertyInfo, object newProperyValue)
+        private static bool? WorksheetModel_OnBeforeChangeRecord(IRecordModel record, System.Reflection.PropertyInfo propertyInfo, object newPropertyValue)
         {
-            if (propertyInfo.Name.Equals("Price"))
-            {
-                decimal price = Convert.ToDecimal(newProperyValue);
-                if (price > 100m) //assume the max price is 100
-                {
-                    MessageBox.Show("Max price is 100.", "Alert", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    return true; // cancel the change
-                }
-            }
-
-            return null;
+            if (!propertyInfo.Name.Equals("Price")) return null;
+            var price = Convert.ToDecimal(newPropertyValue);
+            if (price <= 100m) return null; //assume the max price is 100
+            MessageBox.Show("Max price is 100.", "Alert", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return true; // cancel the change
         }
 
         private void OnAddRecordCommand()
         {
-            int count = _Books.Count;
-            Book book = new Book();
-            book.Id = count;
-            book.Title = string.Format("Title {0}", count);
-            book.Author = string.Format("Author {0}", count);
-            book.BindingType = BindingType.Hardback;
-            book.IsOnSale = true;
-            book.Price = (decimal)(count * 10.11) > 100m ? 100m :(decimal)(count * 10.11);
-            book.Pubdate = DateTime.Now;
-            _Books.Add(book);
+            var count = _books.Count;
+            var book = new Book
+            {
+                Id = count,
+                Title = $"Title {count}",
+                Author = $"Author {count}",
+                BindingType = BindingType.Hardback,
+                IsOnSale = true,
+                Price = (decimal)(count * 10.11) > 100m ? 100m :(decimal)(count * 10.11),
+                Publish = DateTime.Now
+            };
+            _books.Add(book);
         }
 
         private void OnDeleteRecordCommand()
         {
-            if (_Books.Count > 0)
-            {
-                _Books.RemoveAt(_Books.Count - 1);
-            }
+            if (_books.Count <= 0) return;
+            _books.RemoveAt(_books.Count - 1);
         }
 
         private void OnMoveRecordCommand()
         {
-            if (_Books.Count > 2)
-            {
-                _Books.Move(0, _Books.Count - 1);
-            }
+            if (_books.Count <= 2) return;
+            _books.Move(0, _books.Count - 1);
         }
 
         private void OnEditRecordCommand()
         {
-            (_Books[0] as Book).Price = new Random(DateTime.Now.Millisecond).Next(1,100);
-            _WorksheetModel.UpadteRecord(_Books[0]); // invoke UpadteRecord after editing one record.
+            ((Book)_books[0]).Price = new Random(DateTime.Now.Millisecond).Next(1,100);
+            _worksheetModel.UpdateRecord(_books[0]); // invoke UpdateRecord after editing one record.
         }
 
         private void OnGetFromUiCommand()
         {
-            string result = string.Empty;
-            foreach (Book book in _Books)
+            var result = string.Empty;
+            foreach (var recordModel in _books)
             {
-                result += string.Format("Id:{0}\t Title:{1}\t Author:{2}\t BindingType:{3}\t Price:{4}\t Pubdate:{5}\t RowIndex:{6}\r\n",
-                    book.Id, book.Title, book.Author, book.BindingType, book.Price, book.Pubdate, book.RowIndex);
+                var book = (Book)recordModel;
+                result +=
+                    $"Id:{book.Id}\t Title:{book.Title}\t Author:{book.Author}\t BindingType:{book.BindingType}\t Price:{book.Price}\t Publish:{book.Publish}\t RowIndex:{book.RowIndex}\r\n";
             }
 
-            Window window = new Window();
-            window.WindowStartupLocation = WindowStartupLocation.CenterScreen;
-            window.WindowStyle = WindowStyle.ToolWindow;
-            window.SizeToContent = SizeToContent.WidthAndHeight;
-            TextBlock textBlock = new TextBlock();
-            textBlock.Margin = new Thickness(10);
-            textBlock.Text = result;
+            var window = new Window
+            {
+                WindowStartupLocation = WindowStartupLocation.CenterScreen,
+                WindowStyle = WindowStyle.ToolWindow,
+                SizeToContent = SizeToContent.WidthAndHeight
+            };
+            var textBlock = new TextBlock
+            {
+                Margin = new Thickness(10),
+                Text = result
+            };
             window.Content = textBlock;
             window.ShowDialog();
         }
